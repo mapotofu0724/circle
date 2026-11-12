@@ -1,0 +1,1637 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>【周長大偵探】圓與扇形周長邊界辨識練習</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      background-color: #f8fafc;
+    }
+
+    /* SVG 互動線段樣式與動畫 */
+    .seg-hit {
+      cursor: pointer;
+      pointer-events: stroke;
+      transition: stroke-width 0.15s ease;
+    }
+    .seg-hit:hover + .seg-vis {
+      filter: drop-shadow(0px 0px 6px rgba(99, 102, 241, 0.55));
+    }
+
+    .seg-vis {
+      pointer-events: none;
+      transition: stroke 0.2s ease, stroke-width 0.2s ease, stroke-dasharray 0.2s ease;
+    }
+
+    /* 漏水缺口閃爍動畫 */
+    @keyframes pulse-leak {
+      0%, 100% {
+        stroke: #f59e0b;
+        stroke-width: 11px;
+        filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.9));
+      }
+      50% {
+        stroke: #fef08a;
+        stroke-width: 6px;
+      }
+    }
+    .anim-leak {
+      animation: pulse-leak 0.9s infinite ease-in-out;
+    }
+
+    /* 內部陷阱線錯誤閃爍動畫 */
+    @keyframes shake-trap {
+      0%, 100% {
+        stroke: #9333ea;
+        stroke-width: 10px;
+        filter: drop-shadow(0 0 8px rgba(147, 51, 234, 0.85));
+      }
+      50% {
+        stroke: #e9d5ff;
+        stroke-width: 5px;
+      }
+    }
+    .anim-trap {
+      animation: shake-trap 0.8s infinite ease-in-out;
+    }
+
+    /* 網格背景 */
+    .bg-grid-pattern {
+      background-image: 
+        linear-gradient(to right, rgba(203, 213, 225, 0.35) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(203, 213, 225, 0.35) 1px, transparent 1px);
+      background-size: 20px 20px;
+    }
+
+    /* 工具筆選取立體效果 */
+    .pen-btn {
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .pen-btn.active-arc {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 15px -3px rgba(239, 68, 68, 0.35), 0 0 0 3px #ef4444;
+    }
+    .pen-btn.active-line {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.35), 0 0 0 3px #2563eb;
+    }
+    .pen-btn.active-eraser {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 15px -3px rgba(100, 116, 139, 0.3), 0 0 0 3px #475569;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+  <!-- 頂部導覽列 -->
+  <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
+      <!-- 標題與 Logo -->
+      <div class="flex items-center gap-2.5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-white text-xl shadow-sm font-black">
+          🐜
+        </div>
+        <div>
+          <h1 class="text-lg sm:text-xl font-black tracking-tight text-slate-800 flex items-center gap-2">
+            【周長大偵探】
+            <span class="hidden md:inline-block text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full border border-amber-200">
+              六年級圓與扇形周長邊界練習
+            </span>
+          </h1>
+          <p class="text-xs text-slate-500 hidden sm:block">用紅筆描「彎的弧」、藍筆描「直的線」，把塗色區域圍起來不漏水！</p>
+        </div>
+      </div>
+
+      <!-- 學生資訊、進度與隨機5題模式 -->
+      <div class="flex items-center flex-wrap gap-2">
+        <!-- 學生姓名/座號按鈕 -->
+        <button id="studentInfoBtn" onclick="openStudentModal()" class="flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition">
+          <span>👤</span>
+          <span id="studentDisplay">設定座號/姓名</span>
+        </button>
+
+        <!-- 總進度顯示 -->
+        <div class="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-bold">
+          <span>⭐ 已過關：</span>
+          <span id="solvedCountBadge" class="text-emerald-600 font-black">0 / 15</span>
+        </div>
+
+        <!-- 隨機抽 5 題闖關按鈕 -->
+        <button id="quizModeBtn" onclick="startRandomQuiz()" class="flex items-center gap-1.5 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-700 hover:to-violet-700 text-white px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold shadow-sm transition transform active:scale-95">
+          <span>🎲</span>
+          <span id="quizModeBtnText">隨機抽 5 題闖關</span>
+        </button>
+
+        <!-- 重置按鈕 -->
+        <button onclick="openResetModal()" title="重置所有紀錄" class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- 題庫分類導覽列 / 或 隨機 5 題進度條 -->
+    <div class="bg-slate-50 border-t border-slate-200/80 px-3 sm:px-6 py-2">
+      <div class="max-w-7xl mx-auto">
+        <!-- 自由練習模式導覽 -->
+        <div id="normalNavContainer" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <!-- 三大難度分頁 -->
+          <div class="flex items-center gap-1.5 bg-slate-200/70 p-1 rounded-xl w-fit">
+            <button onclick="switchTier(1)" id="tierTab1" class="px-3 py-1 rounded-lg text-xs sm:text-sm font-bold transition">
+              🌱 基礎篇 (1-5)
+            </button>
+            <button onclick="switchTier(2)" id="tierTab2" class="px-3 py-1 rounded-lg text-xs sm:text-sm font-bold transition">
+              🏠 進階複合篇 (6-10)
+            </button>
+            <button onclick="switchTier(3)" id="tierTab3" class="px-3 py-1 rounded-lg text-xs sm:text-sm font-bold transition">
+              🏆 挑戰挖空篇 (11-15)
+            </button>
+          </div>
+
+          <!-- 該難度下的 5 題快速切換按鈕 -->
+          <div id="levelPillsContainer" class="flex items-center gap-1.5 overflow-x-auto py-0.5">
+            <!-- JS 動態生成 -->
+          </div>
+        </div>
+
+        <!-- 隨機 5 題闖關模式專用導覽列 -->
+        <div id="quizNavContainer" class="hidden flex items-center justify-between gap-2 py-0.5">
+          <div class="flex items-center gap-2">
+            <span class="bg-indigo-600 text-white text-xs font-black px-2.5 py-1 rounded-lg flex items-center gap-1">
+              🎲 隨機 5 題挑戰中
+            </span>
+            <div id="quizProgressPills" class="flex items-center gap-1.5">
+              <!-- JS 動態生成第 1~5 題指示燈 -->
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="quizTimerDisplay" class="text-xs sm:text-sm font-mono font-bold text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-200">
+              ⏱️ 00:00
+            </span>
+            <button onclick="exitRandomQuiz()" class="text-xs font-bold text-slate-500 hover:text-rose-600 bg-white border border-slate-300 px-2.5 py-1 rounded-lg transition">
+              退出闖關
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- 主要互動工作區 -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+    
+    <!-- 左側：互動幾何畫布與雙色筆工具列 (佔 7 欄) -->
+    <section class="lg:col-span-7 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col">
+      
+      <!-- 題目資訊標頭 -->
+      <div class="px-4 py-3 bg-gradient-to-r from-slate-50 to-amber-50/40 border-b border-slate-200 flex items-center justify-between gap-2">
+        <div>
+          <div class="flex items-center gap-2">
+            <span id="levelNumberBadge" class="bg-amber-500 text-white text-xs font-black px-2.5 py-0.5 rounded-md">
+              第 1 關
+            </span>
+            <h2 id="levelTitle" class="text-base sm:text-lg font-black text-slate-800">
+              完整的圓
+            </h2>
+            <span id="levelSolvedTag" class="hidden bg-emerald-100 text-emerald-700 text-xs font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+              ✔ 已過關
+            </span>
+          </div>
+          <p id="levelPrompt" class="text-xs sm:text-sm text-slate-600 mt-0.5">
+            請沿著塗色區域的「最外圍邊界」描上顏色，把整個圓圍起來！
+          </p>
+        </div>
+
+        <!-- 視覺輔助：小螞蟻開關 -->
+        <button id="antToggleBtn" onclick="toggleAntPatrol()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition shrink-0 bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100" title="過關後顯示小螞蟻沿著周長散步">
+          <span>🐜</span>
+          <span id="antToggleText">小螞蟻巡邏：開</span>
+        </button>
+      </div>
+
+      <!-- 雙色筆工具選擇器 (核心教學機制 1) -->
+      <div class="px-3 sm:px-4 py-2.5 bg-slate-100/80 border-b border-slate-200">
+        <div class="text-xs font-bold text-slate-500 mb-2 flex items-center justify-between">
+          <span>👇 第一步：選擇畫筆，再點選下方圖形的邊線</span>
+          <button onclick="clearCurrentMarks()" class="text-xs text-slate-500 hover:text-rose-600 font-bold flex items-center gap-1 underline">
+            🔄 全部重畫
+          </button>
+        </div>
+        <div class="grid grid-cols-3 gap-2 sm:gap-3">
+          <!-- 紅筆：弧長筆 -->
+          <button id="penArcBtn" onclick="selectTool('arc')" class="pen-btn active-arc bg-white border-2 border-red-200 rounded-xl p-2 sm:p-2.5 flex items-center gap-2 text-left">
+            <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-red-500 text-white flex items-center justify-center text-base sm:text-lg font-black shrink-0 shadow-inner">
+              🔴
+            </div>
+            <div class="overflow-hidden">
+              <div class="text-xs sm:text-sm font-black text-red-600 truncate">弧長筆 (紅)</div>
+              <div class="text-[11px] text-slate-500 truncate">專畫「彎的曲線」</div>
+            </div>
+          </button>
+
+          <!-- 藍筆：直線筆 -->
+          <button id="penLineBtn" onclick="selectTool('line')" class="pen-btn bg-white border-2 border-blue-200 rounded-xl p-2 sm:p-2.5 flex items-center gap-2 text-left">
+            <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center text-base sm:text-lg font-black shrink-0 shadow-inner">
+              🔵
+            </div>
+            <div class="overflow-hidden">
+              <div class="text-xs sm:text-sm font-black text-blue-600 truncate">直線筆 (藍)</div>
+              <div class="text-[11px] text-slate-500 truncate">專畫「直的線段」</div>
+            </div>
+          </button>
+
+          <!-- 橡皮擦 -->
+          <button id="penEraserBtn" onclick="selectTool('eraser')" class="pen-btn bg-white border-2 border-slate-200 rounded-xl p-2 sm:p-2.5 flex items-center gap-2 text-left">
+            <div class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-slate-500 text-white flex items-center justify-center text-base sm:text-lg font-black shrink-0 shadow-inner">
+              ⚪
+            </div>
+            <div class="overflow-hidden">
+              <div class="text-xs sm:text-sm font-black text-slate-700 truncate">橡皮擦</div>
+              <div class="text-[11px] text-slate-500 truncate">點選可取消標記</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      <!-- 互動 SVG 幾何畫布 (核心教學機制 2) -->
+      <div class="relative bg-grid-pattern flex items-center justify-center p-2 sm:p-4 min-h-[310px] sm:min-h-[370px]">
+        <!-- 圖例小提示 -->
+        <div class="absolute top-2.5 left-2.5 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-xl px-2.5 py-1.5 text-[11px] text-slate-600 flex flex-wrap items-center gap-3 shadow-sm pointer-events-none">
+          <span class="flex items-center gap-1">
+            <span class="w-3.5 h-3.5 rounded bg-amber-200 border border-amber-400 inline-block"></span>
+            塗色區域 (草皮)
+          </span>
+          <span class="flex items-center gap-1">
+            <span class="w-4 h-1 bg-red-500 rounded inline-block"></span>
+            彎的線 (弧)
+          </span>
+          <span class="flex items-center gap-1">
+            <span class="w-4 h-1 bg-blue-600 rounded inline-block"></span>
+            直的線
+          </span>
+        </div>
+
+        <!-- 主 SVG 視窗 -->
+        <svg id="geometrySvg" viewBox="0 0 360 320" class="w-full max-w-[400px] h-auto select-none overflow-visible">
+          <defs>
+            <!-- 塗色區域柔和斜線紋理 -->
+            <pattern id="grassPattern" width="12" height="12" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+              <rect width="12" height="12" fill="#fde68a" fill-opacity="0.55" />
+              <line x1="0" y1="0" x2="0" y2="12" stroke="#f59e0b" stroke-width="2" stroke-opacity="0.22" />
+            </pattern>
+            <!-- 過關時的翠綠草皮紋理 -->
+            <pattern id="grassSuccessPattern" width="12" height="12" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+              <rect width="12" height="12" fill="#a7f3d0" fill-opacity="0.6" />
+              <line x1="0" y1="0" x2="0" y2="12" stroke="#10b981" stroke-width="2" stroke-opacity="0.25" />
+            </pattern>
+          </defs>
+
+          <!-- 圖層 1：底層參考圖形與塗色區域 -->
+          <g id="svgShadedLayer"></g>
+
+          <!-- 圖層 2：圓心點、直角記號、角度標示等裝飾 -->
+          <g id="svgDecorLayer" class="pointer-events-none"></g>
+
+          <!-- 圖層 3：可點擊互動線段 (包含視覺線與加粗感應區) -->
+          <g id="svgSegmentsLayer"></g>
+
+          <!-- 圖層 4：小螞蟻沿周長散步動畫層 -->
+          <g id="svgAntLayer" class="pointer-events-none"></g>
+        </svg>
+      </div>
+    </section>
+
+    <!-- 右側：即時「看圖點菜」統計面板、倒水驗證與迷思回饋 (佔 5 欄) -->
+    <section class="lg:col-span-5 flex flex-col gap-4">
+      
+      <!-- 卡片 1：「看圖點菜」即時線段計數器 (核心教學機制 3) -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm sm:text-base font-black text-slate-800 flex items-center gap-1.5">
+            <span>📋</span>
+            <span>「看圖點菜」周長線段清點</span>
+          </h3>
+          <span class="text-xs font-bold text-slate-400">邊畫邊數不漏算</span>
+        </div>
+
+        <!-- 紅藍計數器方塊 -->
+        <div class="grid grid-cols-2 gap-3 mb-3">
+          <div class="bg-red-50/80 border-2 border-red-200 rounded-xl p-3 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-red-700">🔴 彎的線 (弧)</div>
+              <div class="text-[11px] text-red-500">圓周或扇形弧長</div>
+            </div>
+            <div class="text-2xl sm:text-3xl font-black text-red-600">
+              <span id="arcCountNum">0</span> <span class="text-xs font-bold">條</span>
+            </div>
+          </div>
+
+          <div class="bg-blue-50/80 border-2 border-blue-200 rounded-xl p-3 flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold text-blue-700">🔵 直的線</div>
+              <div class="text-[11px] text-blue-500">半徑、直徑或邊長</div>
+            </div>
+            <div class="text-2xl sm:text-3xl font-black text-blue-600">
+              <span id="lineCountNum">0</span> <span class="text-xs font-bold">條</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 動態算式預覽列 -->
+        <div class="bg-slate-100 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm font-bold text-slate-700 flex items-center justify-between flex-wrap gap-1">
+          <span>目前標記：</span>
+          <span id="liveFormulaSummary" class="font-black text-slate-800">
+            尚未標記任何線段
+          </span>
+        </div>
+      </div>
+
+      <!-- 卡片 2：檢查答案按鈕與「倒水不漏水 / 小螞蟻散步」診斷回饋區 (核心教學機制 4) -->
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col gap-3">
+        <!-- 主要檢查按鈕 -->
+        <div class="flex items-center gap-2">
+          <button id="checkAnswerBtn" onclick="verifyPerimeter()" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-black py-3 px-4 rounded-xl shadow-md hover:shadow-lg transition transform active:scale-98 flex items-center justify-center gap-2 text-base">
+            <span>💧</span>
+            <span>檢查答案（倒水測試）</span>
+          </button>
+
+          <button id="nextLevelBtn" onclick="goToNextLevel()" class="hidden bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-black py-3 px-5 rounded-xl shadow-md transition transform active:scale-98 flex items-center justify-center gap-1.5 text-base shrink-0">
+            <span id="nextLevelBtnText">下一關</span>
+            <span>➔</span>
+          </button>
+        </div>
+
+        <!-- 診斷訊息回饋盒 -->
+        <div id="feedbackBox" class="rounded-xl p-3.5 border-2 border-slate-200 bg-slate-50 transition-all">
+          <div class="flex items-start gap-2.5">
+            <div id="feedbackIcon" class="text-2xl shrink-0 mt-0.5">💡</div>
+            <div class="flex-1">
+              <div id="feedbackTitle" class="font-black text-sm sm:text-base text-slate-800">
+                周長小偵探任務提示
+              </div>
+              <p id="feedbackMessage" class="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+                想像塗色區域是一塊草皮，我們要沿著草皮的<strong>「最外圍邊界」</strong>蓋一圈柵欄。請用<strong>紅筆畫彎的線</strong>、<strong>藍筆畫直的線</strong>，完成後按下「檢查答案」！
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 過關後解鎖的「周長組成結構與列式觀念解析」 -->
+        <div id="formulaBreakdownCard" class="hidden rounded-xl bg-emerald-50/90 border-2 border-emerald-300 p-3.5">
+          <div class="text-xs font-black uppercase tracking-wider text-emerald-700 mb-1 flex items-center gap-1">
+            <span>🎓</span>
+            <span>這個圖形的周長怎麼算？（觀念拆解）</span>
+          </div>
+          <div id="formulaCompositionText" class="text-sm sm:text-base font-black text-emerald-950 bg-white/90 rounded-lg px-3 py-2 border border-emerald-200 my-1.5">
+            周長組成 ＝ 1個半圓弧 ＋ 1條直徑
+          </div>
+          <p id="formulaExampleText" class="text-xs text-emerald-800 leading-relaxed mt-1">
+            <!-- JS 動態填入具體計算提示 -->
+          </p>
+        </div>
+      </div>
+
+      <!-- 卡片 3：防呆口訣小抄 -->
+      <div class="bg-amber-50/70 rounded-2xl border border-amber-200/80 p-3.5 text-xs text-amber-900 space-y-1.5">
+        <div class="font-black text-amber-950 flex items-center gap-1.5 text-sm">
+          <span>🧭</span>
+          <span>周長防呆三口訣：</span>
+        </div>
+        <p>1. <strong>外圍蓋柵欄：</strong>只有接觸到塗色區域「最外面邊界」的線才要算。</p>
+        <p>2. <strong>肚子裡的不算：</strong>被包在塗色區域中間的虛線或輔助線，絕對不能算！</p>
+        <p>3. <strong>倒水不漏水：</strong>描完的紅線與藍線必須頭尾相連圍成一圈，不能有缺口！</p>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- 彈出視窗 1：學生座號與姓名設定 -->
+  <div id="studentModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200">
+      <h3 class="text-lg font-black text-slate-800 flex items-center gap-2 mb-1">
+        <span>👤</span> 設定班級、座號與姓名
+      </h3>
+      <p class="text-xs text-slate-500 mb-4">輸入後會自動保存在這台裝置中，完成隨機 5 題闖關時會顯示在過關證書上喔！</p>
+      
+      <div class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">班級（例如：六年甲班）</label>
+          <input id="inputClass" type="text" placeholder="六年___班" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">座號</label>
+            <input id="inputSeat" type="number" min="1" max="50" placeholder="例如：12" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 mb-1">姓名或暱稱</label>
+            <input id="inputName" type="text" placeholder="請輸入姓名" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-sm font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-2 mt-6">
+        <button onclick="closeStudentModal()" class="px-4 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100">取消</button>
+        <button onclick="saveStudentInfo()" class="px-5 py-2 rounded-xl text-sm font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm">儲存設定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 彈出視窗 2：隨機 5 題闖關完成證書 (方便學生截圖或給老師看) -->
+  <div id="certificateModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border-4 border-amber-400 relative overflow-hidden">
+      <div class="text-center">
+        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-amber-100 text-4xl mb-2 shadow-inner">
+          🏆
+        </div>
+        <h3 class="text-2xl font-black text-slate-800">【周長大偵探】闖關成功！</h3>
+        <p class="text-xs font-bold text-amber-700 mt-0.5">已完成隨機 5 題圓與扇形周長邊界辨識挑戰</p>
+      </div>
+
+      <!-- 學生與成績資訊卡 -->
+      <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-4 my-4 border border-amber-200 space-y-2.5">
+        <div class="flex items-center justify-between border-b border-amber-200/70 pb-2">
+          <span class="text-xs font-bold text-slate-500">挑戰小偵探：</span>
+          <span id="certStudentName" class="text-base font-black text-slate-800">未設定姓名</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center pt-1">
+          <div class="bg-white rounded-xl p-2 border border-amber-100">
+            <div class="text-[11px] text-slate-500 font-bold">挑戰題數</div>
+            <div class="text-lg font-black text-emerald-600">5 / 5 題</div>
+          </div>
+          <div class="bg-white rounded-xl p-2 border border-amber-100">
+            <div class="text-[11px] text-slate-500 font-bold">一次答對率</div>
+            <div id="certAccuracy" class="text-lg font-black text-indigo-600">100%</div>
+          </div>
+          <div class="bg-white rounded-xl p-2 border border-amber-100">
+            <div class="text-[11px] text-slate-500 font-bold">完成時間</div>
+            <div id="certTimeUsed" class="text-lg font-black text-amber-600">01:15</div>
+          </div>
+        </div>
+
+        <!-- 完成的 5 個題目清單 -->
+        <div class="pt-2">
+          <div class="text-xs font-bold text-slate-500 mb-1.5">本次過關圖形：</div>
+          <div id="certCompletedList" class="flex flex-wrap gap-1.5">
+            <!-- JS 動態生成標籤 -->
+          </div>
+        </div>
+      </div>
+
+      <p class="text-xs text-center text-slate-500 mb-4">
+        💡 請將此畫面給老師確認，或截圖保存你的練習成果！
+      </p>
+
+      <div class="flex flex-col sm:flex-row gap-2">
+        <button onclick="startRandomQuiz()" class="flex-1 py-2.5 px-4 rounded-xl font-black text-sm bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition">
+          🎲 再抽 5 題練習
+        </button>
+        <button onclick="closeCertificateAndReturn()" class="flex-1 py-2.5 px-4 rounded-xl font-bold text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 transition">
+          回到自由題庫
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 彈出視窗 3：確認重置進度 -->
+  <div id="resetModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-5 shadow-xl border border-slate-200 text-center">
+      <div class="text-3xl mb-2">⚠️</div>
+      <h3 class="text-base font-black text-slate-800">確定要清除所有過關紀錄嗎？</h3>
+      <p class="text-xs text-slate-500 mt-1 mb-5">這將會把已獲得的過關星星歸零，重新開始練習。</p>
+      <div class="flex justify-center gap-2">
+        <button onclick="closeResetModal()" class="flex-1 py-2 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200">取消</button>
+        <button onclick="confirmResetProgress()" class="flex-1 py-2 rounded-xl text-sm font-bold text-white bg-rose-600 hover:bg-rose-700">確定清除</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /******************************************************************
+     * 15 道精心設計的幾何題庫 (分為 3 大難度階層)
+     * 每個線段定義：
+     * - id: 唯一識別碼
+     * - d: SVG Path 字串
+     * - kind: 'arc' (彎的弧線) 或 'line' (直的線段)
+     * - role: 'boundary' (應選的外圍周長邊界) 或 'trap' (不該選的內部陷阱線/外部未塗色輔助線)
+     * - trapReason: 當學生誤選此陷阱線時的專屬提示
+     ******************************************************************/
+    const LEVELS = [
+      // ==================== 基礎篇 (Levels 1-5) ====================
+      {
+        id: 1,
+        tier: 1,
+        title: "完整的圓",
+        prompt: "塗色區域是一個完整的圓形草皮。請把它的「圓周長」描出來，小心不要畫到肚子裡的直徑喔！",
+        shadedPath: "M 180,60 A 100,100 0 1,1 180,260 A 100,100 0 1,1 180,60 Z",
+        antPath: "M 180,60 A 100,100 0 1,1 180,260 A 100,100 0 1,1 180,60",
+        decor: [
+          { type: 'point', x: 180, y: 160, label: '圓心' },
+          { type: 'text', x: 215, y: 152, text: '直徑 10cm' }
+        ],
+        segments: [
+          { id: 's1_top_arc', d: "M 80,160 A 100,100 0 0,1 280,160", kind: 'arc', role: 'boundary', label: '上半圓弧' },
+          { id: 's1_bot_arc', d: "M 280,160 A 100,100 0 0,1 80,160", kind: 'arc', role: 'boundary', label: '下半圓弧' },
+          { id: 's1_trap_dia', d: "M 80,160 L 280,160", kind: 'line', role: 'trap', trapReason: "中間這條橫線是包在圓形「肚子裡面」的直徑，蓋外圍柵欄時不用蓋中間喔！" }
+        ],
+        composition: "周長組成 ＝ 1 個完整的圓周（彎的線）＋ 0 條直線",
+        exampleCalc: "💡 觀念解析：完整的圓全部都是彎的邊界！算式只要用「直徑 × 3.14」，裡面的直徑只是告訴我們圓的大小，不能加進周長裡。"
+      },
+      {
+        id: 2,
+        tier: 1,
+        title: "半圓形",
+        prompt: "這是一個半圓形。如果只圍上面彎彎的弧，底下的羊就會跑掉囉！還有哪裡要圍起來？",
+        shadedPath: "M 70,210 A 110,110 0 0,1 290,210 L 70,210 Z",
+        antPath: "M 70,210 A 110,110 0 0,1 290,210 L 70,210",
+        decor: [
+          { type: 'point', x: 180, y: 210, label: '' },
+          { type: 'rightAngle', d: "M 180,196 L 194,196 L 194,210" },
+          { type: 'text', x: 192, y: 155, text: '半徑' }
+        ],
+        segments: [
+          { id: 's2_arc', d: "M 70,210 A 110,110 0 0,1 290,210", kind: 'arc', role: 'boundary', label: '半圓弧' },
+          { id: 's2_dia', d: "M 70,210 L 290,210", kind: 'line', role: 'boundary', label: '底部直徑' },
+          { id: 's2_trap_r', d: "M 180,210 L 180,100", kind: 'line', role: 'trap', trapReason: "中間垂直的虛線是塗色區域內部的「半徑」，不是最外面的邊界喔！" }
+        ],
+        composition: "周長組成 ＝ 🔴 1 條半圓弧 ＋ 🔵 1 條直徑",
+        exampleCalc: "💡 觀念解析：半圓的周長常忘記加底下的直徑！記得「半圓弧長 ＋ 1條直徑」才是一個封閉不漏水的半圓。"
+      },
+      {
+        id: 3,
+        tier: 1,
+        title: "四分之一圓扇形 (90°)",
+        prompt: "這是一塊四分之一圓的披薩（扇形），請用紅筆和藍筆把它的周長邊界圍起來！",
+        shadedPath: "M 110,230 L 110,90 A 140,140 0 0,1 250,230 Z",
+        antPath: "M 110,230 L 110,90 A 140,140 0 0,1 250,230 L 110,230",
+        decor: [
+          { type: 'rightAngle', d: "M 110,212 L 128,212 L 128,230" },
+          { type: 'point', x: 110, y: 230, label: '圓心' }
+        ],
+        segments: [
+          { id: 's3_arc', d: "M 110,90 A 140,140 0 0,1 250,230", kind: 'arc', role: 'boundary', label: '1/4圓弧' },
+          { id: 's3_r1', d: "M 110,230 L 110,90", kind: 'line', role: 'boundary', label: '左側半徑' },
+          { id: 's3_r2', d: "M 110,230 L 250,230", kind: 'line', role: 'boundary', label: '底部半徑' },
+          { id: 's3_trap1', d: "M 110,90 L 250,90", kind: 'line', role: 'trap', trapReason: "外面的虛線沒有塗色，不屬於扇形草皮的邊界喔！" },
+          { id: 's3_trap2', d: "M 250,90 L 250,230", kind: 'line', role: 'trap', trapReason: "外面的虛線沒有塗色，不屬於扇形草皮的邊界喔！" }
+        ],
+        composition: "周長組成 ＝ 🔴 1 條四分之一圓弧 ＋ 🔵 2 條半徑",
+        exampleCalc: "💡 觀念解析：所有扇形的周長都包含「1條弧長 ＋ 2條半徑」，千萬別把外面的空白輔助線算進去！"
+      },
+      {
+        id: 4,
+        tier: 1,
+        title: "三分之一圓扇形 (120°)",
+        prompt: "圓心角 120° 的扇形，周長包含哪幾條線？注意別畫到沒有塗色的部分喔！",
+        // Center (180,190), R=110. Angles: -150 deg (85, 135) to -30 deg (275, 135)
+        shadedPath: "M 180,190 L 85,135 A 110,110 0 0,1 275,135 Z",
+        antPath: "M 180,190 L 85,135 A 110,110 0 0,1 275,135 L 180,190",
+        decor: [
+          { type: 'arcLabel', d: "M 154,175 A 30,30 0 0,1 206,175", text: "120°", tx: 180, ty: 162 },
+          { type: 'point', x: 180, y: 190, label: '' }
+        ],
+        segments: [
+          { id: 's4_arc', d: "M 85,135 A 110,110 0 0,1 275,135", kind: 'arc', role: 'boundary', label: '120°扇形弧' },
+          { id: 's4_r1', d: "M 180,190 L 85,135", kind: 'line', role: 'boundary', label: '左半徑' },
+          { id: 's4_r2', d: "M 180,190 L 275,135", kind: 'line', role: 'boundary', label: '右半徑' },
+          { id: 's4_trap_mid', d: "M 180,190 L 180,80", kind: 'line', role: 'trap', trapReason: "中間這條虛線在扇形的肚子裡，不是外圍邊界喔！" },
+          { id: 's4_trap_chord', d: "M 85,135 L 275,135", kind: 'line', role: 'trap', trapReason: "連接兩端的直線穿過扇形內部，最外圍是上面彎彎的弧線才對喔！" }
+        ],
+        composition: "周長組成 ＝ 🔴 1 條三分之一圓弧 ＋ 🔵 2 條半徑",
+        exampleCalc: "💡 觀念解析：120° 是 360° 的三分之一，算出「圓周長 × 1/3」之後，務必再加上「2 條半徑」把缺口封起來！"
+      },
+      {
+        id: 5,
+        tier: 1,
+        title: "四分之三圓扇形 (小精靈形 270°)",
+        prompt: "像小精靈嘴巴張開的四分之三圓！請沿著塗色區域圍一圈，別畫到嘴巴外面去了！",
+        // Center (180,160), R=100. Missing bottom-right quadrant (0 to 90 deg, i.e., (280,160) to (180,260))
+        shadedPath: "M 180,160 L 180,260 A 100,100 0 1,1 280,160 Z",
+        antPath: "M 180,160 L 180,260 A 100,100 0 1,1 280,160 L 180,160",
+        decor: [
+          { type: 'arcLabel', d: "M 180,185 A 25,25 0 1,1 205,160", text: "270°", tx: 145, ty: 145 },
+          { type: 'point', x: 180, y: 160, label: '' }
+        ],
+        segments: [
+          { id: 's5_arc1', d: "M 180,260 A 100,100 0 1,1 180,60", kind: 'arc', role: 'boundary', label: '左半部圓弧' },
+          { id: 's5_arc2', d: "M 180,60 A 100,100 0 0,1 280,160", kind: 'arc', role: 'boundary', label: '右上圓弧' },
+          { id: 's5_r1', d: "M 180,160 L 280,160", kind: 'line', role: 'boundary', label: '水平半徑' },
+          { id: 's5_r2', d: "M 180,160 L 180,260", kind: 'line', role: 'boundary', label: '垂直半徑' },
+          { id: 's5_trap_arc', d: "M 280,160 A 100,100 0 0,1 180,260", kind: 'arc', role: 'trap', trapReason: "右下角這段虛線圓弧已經被挖空了（沒有塗色），柵欄要沿著嘴巴裡面的兩條半徑蓋喔！" }
+        ],
+        composition: "周長組成 ＝ 🔴 1 個四分之三圓弧 ＋ 🔵 2 條半徑",
+        exampleCalc: "💡 觀念解析：雖然缺口凹進去，但構成嘴巴邊緣的「2條半徑」正是塗色區域的邊界，必須算進周長！"
+      },
+
+      // ==================== 進階篇：常見生活複合圖形 (Levels 6-10) ====================
+      {
+        id: 6,
+        tier: 2,
+        title: "拱門形（正方形 ＋ 半圓）",
+        prompt: "這是一個常見的拱門窗戶（上面半圓、下面正方形）。最容易多算哪一條肚子裡的線呢？",
+        // Square from x=110..250, y=140..280 (width 140). Semicircle on top: center (180,140), R=70
+        shadedPath: "M 110,140 A 70,70 0 0,1 250,140 L 250,280 L 110,280 Z",
+        antPath: "M 110,140 A 70,70 0 0,1 250,140 L 250,280 L 110,280 L 110,140",
+        decor: [
+          { type: 'point', x: 180, y: 140, label: '' },
+          { type: 'text', x: 180, y: 265, text: '正方形邊長 10cm' }
+        ],
+        segments: [
+          { id: 's6_arc', d: "M 110,140 A 70,70 0 0,1 250,140", kind: 'arc', role: 'boundary', label: '上方半圓弧' },
+          { id: 's6_left', d: "M 110,140 L 110,280", kind: 'line', role: 'boundary', label: '左邊長' },
+          { id: 's6_right', d: "M 250,140 L 250,280", kind: 'line', role: 'boundary', label: '右邊長' },
+          { id: 's6_bottom', d: "M 110,280 L 250,280", kind: 'line', role: 'boundary', label: '底邊長' },
+          { id: 's6_trap_mid', d: "M 110,140 L 250,140", kind: 'line', role: 'trap', trapReason: "抓到了！中間這條橫虛線被包在拱門的「肚子裡面」，把圖形剪下來時根本摸不到它，所以不能算！" }
+        ],
+        composition: "周長組成 ＝ 🔴 1 條半圓弧 ＋ 🔵 3 條正方形邊長",
+        exampleCalc: "💡 觀念解析：很多同學會把正方形的 4 條邊全加起來，但上面那條邊被半圓蓋在裡面了，所以直線只有「左、下、右」共 3 條！"
+      },
+      {
+        id: 7,
+        tier: 2,
+        title: "操場跑道形（長方形 ＋ 兩半圓）",
+        prompt: "學校操場是由中間的長方形和左右兩個半圓拼成的。沿著操場最外圍跑一圈會經過哪些線？",
+        // Center rect: x=120..240, y=90..230 (height 140, R=70). Left arc center (120,160), Right arc center (240,160)
+        shadedPath: "M 120,90 L 240,90 A 70,70 0 0,1 240,230 L 120,230 A 70,70 0 0,1 120,90 Z",
+        antPath: "M 120,90 L 240,90 A 70,70 0 0,1 240,230 L 120,230 A 70,70 0 0,1 120,90",
+        decor: [
+          { type: 'text', x: 180, y: 165, text: '操場草皮' }
+        ],
+        segments: [
+          { id: 's7_left_arc', d: "M 120,230 A 70,70 0 0,1 120,90", kind: 'arc', role: 'boundary', label: '左半圓弧' },
+          { id: 's7_right_arc', d: "M 240,90 A 70,70 0 0,1 240,230", kind: 'arc', role: 'boundary', label: '右半圓弧' },
+          { id: 's7_top', d: "M 120,90 L 240,90", kind: 'line', role: 'boundary', label: '上方直線跑道' },
+          { id: 's7_bot', d: "M 240,230 L 120,230", kind: 'line', role: 'boundary', label: '下方直線跑道' },
+          { id: 's7_trap_l', d: "M 120,90 L 120,230", kind: 'line', role: 'trap', trapReason: "裡面的直線是長方形與半圓相接的內部虛線，跑步繞操場外圍時不會跑進中間喔！" },
+          { id: 's7_trap_r', d: "M 240,90 L 240,230", kind: 'line', role: 'trap', trapReason: "裡面的直線是長方形與半圓相接的內部虛線，跑步繞操場外圍時不會跑進中間喔！" }
+        ],
+        composition: "周長組成 ＝ 🔴 2 個半圓弧（合起來是 1 個圓周）＋ 🔵 上下 2 條直線",
+        exampleCalc: "💡 觀念解析：左右兩個半圓弧合起來剛好是「1個完整的圓周長」，再加上長方形「上下 2 條長邊」就是操場周長（裡面的兩條寬邊不用算）！"
+      },
+      {
+        id: 8,
+        tier: 2,
+        title: "甜筒冰淇淋形（三角形 ＋ 半圓）",
+        prompt: "美味的甜筒冰淇淋！上面是半圓形冰淇淋，下面是三角形甜筒，請描出它的外圍周長！",
+        // Top semicircle: (110,130) to (250,130), R=70. Cone tip at (180,280).
+        shadedPath: "M 110,130 A 70,70 0 0,1 250,130 L 180,280 Z",
+        antPath: "M 110,130 A 70,70 0 0,1 250,130 L 180,280 L 110,130",
+        decor: [
+          { type: 'point', x: 180, y: 130, label: '' }
+        ],
+        segments: [
+          { id: 's8_arc', d: "M 110,130 A 70,70 0 0,1 250,130", kind: 'arc', role: 'boundary', label: '半圓弧' },
+          { id: 's8_left', d: "M 110,130 L 180,280", kind: 'line', role: 'boundary', label: '甜筒左斜邊' },
+          { id: 's8_right', d: "M 250,130 L 180,280", kind: 'line', role: 'boundary', label: '甜筒右斜邊' },
+          { id: 's8_trap_base', d: "M 110,130 L 250,130", kind: 'line', role: 'trap', trapReason: "甜筒跟冰淇淋交界的這條直徑包在圖形肚子裡，不是外圍邊界喔！" },
+          { id: 's8_trap_h', d: "M 180,130 L 180,280", kind: 'line', role: 'trap', trapReason: "中間垂直的虛線是三角形的「高」，包在肚子裡面不能算！" }
+        ],
+        composition: "周長組成 ＝ 🔴 1 條半圓弧 ＋ 🔵 2 條三角形斜邊",
+        exampleCalc: "💡 觀念解析：交界處的直徑和中間的高都在圖形內部，只有最外面的「1條半圓弧 ＋ 2條斜邊」才是周長。"
+      },
+      {
+        id: 9,
+        tier: 2,
+        title: "愛心形（正方形 ＋ 兩個半圓）",
+        prompt: "由一個正方形和兩個半圓拼成的愛心圖案，數數看外圍共有幾條彎線、幾條直線？",
+        // Tilted or axis-aligned square: Let's use axis-aligned square x=120..240, y=130..250 (size 120, R=60)
+        // Top semicircle on (120,130)-(240,130), Left semicircle on (120,250)-(120,130)
+        shadedPath: "M 120,130 A 60,60 0 0,1 240,130 L 240,250 L 120,250 A 60,60 0 0,1 120,130 Z",
+        antPath: "M 120,130 A 60,60 0 0,1 240,130 L 240,250 L 120,250 A 60,60 0 0,1 120,130",
+        decor: [
+          { type: 'text', x: 180, y: 195, text: '正方形' }
+        ],
+        segments: [
+          { id: 's9_top_arc', d: "M 120,130 A 60,60 0 0,1 240,130", kind: 'arc', role: 'boundary', label: '上方半圓弧' },
+          { id: 's9_left_arc', d: "M 120,250 A 60,60 0 0,1 120,130", kind: 'arc', role: 'boundary', label: '左方半圓弧' },
+          { id: 's9_right_line', d: "M 240,130 L 240,250", kind: 'line', role: 'boundary', label: '右側直線邊' },
+          { id: 's9_bot_line', d: "M 240,250 L 120,250", kind: 'line', role: 'boundary', label: '底部直線邊' },
+          { id: 's9_trap_top', d: "M 120,130 L 240,130", kind: 'line', role: 'trap', trapReason: "正方形上面的邊已經被半圓包進肚子裡了，不是外圍邊界喔！" },
+          { id: 's9_trap_left', d: "M 120,130 L 120,250", kind: 'line', role: 'trap', trapReason: "正方形左邊的邊已經被半圓包進肚子裡了，不是外圍邊界喔！" }
+        ],
+        composition: "周長組成 ＝ 🔴 2 條半圓弧（合為 1 個圓周）＋ 🔵 2 條正方形邊長",
+        exampleCalc: "💡 觀念解析：正方形原本有 4 條邊，其中 2 條貼上半圓後藏在內部了，所以外圍只剩「2個半圓弧 ＋ 2條直線邊」！"
+      },
+      {
+        id: 10,
+        tier: 2,
+        title: "彩虹橋形（扇形環 / 大半圓減小半圓）",
+        prompt: "像拱橋一樣的塗色區域（大半圓挖掉中間空白的小半圓）。仔細看塗色區域的邊界有哪些！",
+        // Center (180,230). Outer R=130 (x: 50 to 310), Inner R=65 (x: 115 to 245)
+        shadedPath: "M 50,230 A 130,130 0 0,1 310,230 L 245,230 A 65,65 0 0,0 115,230 Z",
+        antPath: "M 50,230 A 130,130 0 0,1 310,230 L 245,230 A 65,65 0 0,0 115,230 L 50,230",
+        decor: [
+          { type: 'point', x: 180, y: 230, label: '圓心' }
+        ],
+        segments: [
+          { id: 's10_outer_arc', d: "M 50,230 A 130,130 0 0,1 310,230", kind: 'arc', role: 'boundary', label: '外圈大弧' },
+          { id: 's10_inner_arc', d: "M 245,230 A 65,65 0 0,0 115,230", kind: 'arc', role: 'boundary', label: '內圈小弧' },
+          { id: 's10_left_step', d: "M 50,230 L 115,230", kind: 'line', role: 'boundary', label: '左底直線段' },
+          { id: 's10_right_step', d: "M 245,230 L 310,230", kind: 'line', role: 'boundary', label: '右底直線段' },
+          { id: 's10_trap_mid', d: "M 115,230 L 245,230", kind: 'line', role: 'trap', trapReason: "中間拱門洞底下是「空白沒有塗色」的區域，不需要幫空白的地方蓋柵欄喔！" }
+        ],
+        composition: "周長組成 ＝ 🔴 2 條彎弧（1大弧＋1小弧）＋ 🔵 左右 2 小段直線",
+        exampleCalc: "💡 觀念解析：彩虹橋不只有外面的大弧，裡面拱門洞的「內弧」也是塗色草皮的邊界！再加上左右兩小段橋墩直線才完整。"
+      },
+
+      // ==================== 挑戰篇：陰影挖空與葉片圖形 (Levels 11-15) ====================
+      {
+        id: 11,
+        tier: 3,
+        title: "正方形挖掉四分之一圓",
+        prompt: "正方形被剪掉左上角空白的四分之一圓後，剩下的塗色區域周長包含哪幾條線？",
+        // Square x=100..260, y=80..240 (size 160). Quarter circle centered at top-left (100,80) with R=160 goes from (260,80) to (100,240)
+        shadedPath: "M 260,80 L 260,240 L 100,240 A 160,160 0 0,0 260,80 Z",
+        antPath: "M 260,80 L 260,240 L 100,240 A 160,160 0 0,0 260,80",
+        decor: [
+          { type: 'point', x: 100, y: 80, label: '圓心' },
+          { type: 'text', x: 145, y: 125, text: '空白挖掉' }
+        ],
+        segments: [
+          { id: 's11_arc', d: "M 100,240 A 160,160 0 0,0 260,80", kind: 'arc', role: 'boundary', label: '1/4圓弧邊界' },
+          { id: 's11_right', d: "M 260,80 L 260,240", kind: 'line', role: 'boundary', label: '右側正方形邊' },
+          { id: 's11_bot', d: "M 260,240 L 100,240", kind: 'line', role: 'boundary', label: '底部正方形邊' },
+          { id: 's11_trap_top', d: "M 100,80 L 260,80", kind: 'line', role: 'trap', trapReason: "上面這條虛線是空白區域的邊，沒有接觸到塗色草皮，不能算進塗色周長喔！" },
+          { id: 's11_trap_left', d: "M 100,80 L 100,240", kind: 'line', role: 'trap', trapReason: "左邊這條虛線是空白區域的邊，沒有接觸到塗色草皮，不能算進塗色周長喔！" }
+        ],
+        composition: "周長組成 ＝ 🔴 1 條四分之一圓弧 ＋ 🔵 2 條正方形邊長",
+        exampleCalc: "💡 觀念解析：看塗色區域就好！左上角空白的兩條虛線已經被剪掉了，所以只算「1條彎弧 ＋ 右邊和下面 2條直線」。"
+      },
+      {
+        id: 12,
+        tier: 3,
+        title: "四角星形（正方形挖掉四個扇形）",
+        prompt: "正方形的四個角都剪掉四分之一圓，中間剩下的「塗色四角星」有直線邊界嗎？仔細觀察！",
+        // Square x=100..260, y=80..240 (size 160, R=80). Midpoints: Top(180,80), Right(260,160), Bot(180,240), Left(100,160)
+        shadedPath: "M 180,80 A 80,80 0 0,0 260,160 A 80,80 0 0,0 180,240 A 80,80 0 0,0 100,160 A 80,80 0 0,0 180,80 Z",
+        antPath: "M 180,80 A 80,80 0 0,0 260,160 A 80,80 0 0,0 180,240 A 80,80 0 0,0 100,160 A 80,80 0 0,0 180,80",
+        decor: [
+          { type: 'text', x: 180, y: 165, text: '塗色區域' }
+        ],
+        segments: [
+          { id: 's12_arc_tr', d: "M 180,80 A 80,80 0 0,0 260,160", kind: 'arc', role: 'boundary', label: '右上凹弧' },
+          { id: 's12_arc_br', d: "M 260,160 A 80,80 0 0,0 180,240", kind: 'arc', role: 'boundary', label: '右下凹弧' },
+          { id: 's12_arc_bl', d: "M 180,240 A 80,80 0 0,0 100,160", kind: 'arc', role: 'boundary', label: '左下凹弧' },
+          { id: 's12_arc_tl', d: "M 100,160 A 80,80 0 0,0 180,80", kind: 'arc', role: 'boundary', label: '左上凹弧' },
+          { id: 's12_trap_t', d: "M 100,80 L 260,80", kind: 'line', role: 'trap', trapReason: "外圍的正方形直線全部都是「空白扇形」的邊，中間的塗色星星完全是由 4 條彎彎的弧線圍成的喔！" },
+          { id: 's12_trap_r', d: "M 260,80 L 260,240", kind: 'line', role: 'trap', trapReason: "外圍的正方形直線全部都是「空白扇形」的邊，中間的塗色星星完全是由 4 條彎彎的弧線圍成的喔！" },
+          { id: 's12_trap_b', d: "M 260,240 L 100,240", kind: 'line', role: 'trap', trapReason: "外圍的正方形直線全部都是「空白扇形」的邊，中間的塗色星星完全是由 4 條彎彎的弧線圍成的喔！" },
+          { id: 's12_trap_l', d: "M 100,240 L 100,80", kind: 'line', role: 'trap', trapReason: "外圍的正方形直線全部都是「空白扇形」的邊，中間的塗色星星完全是由 4 條彎彎的弧線圍成的喔！" }
+        ],
+        composition: "周長組成 ＝ 🔴 4 條四分之一圓弧（合為 1 個圓周）＋ 🔵 0 條直線",
+        exampleCalc: "💡 觀念解析：這題超經典！塗色星星的周圍全部都是彎的線（4個四分之一圓弧合起來剛好等於 1 個圓周長），外框的正方形直線一條都不用加！"
+      },
+      {
+        id: 13,
+        tier: 3,
+        title: "葉片形 / 橄欖形（兩扇形重疊）",
+        prompt: "正方形裡畫兩個四分之一圓，重疊出中間的「塗色葉片」。葉片的周長需要加正方形邊長嗎？",
+        // Square x=100..260, y=80..240 (size 160). Leaf between (100,240) and (260,80)
+        shadedPath: "M 100,240 A 160,160 0 0,1 260,80 A 160,160 0 0,1 100,240 Z",
+        antPath: "M 100,240 A 160,160 0 0,1 260,80 A 160,160 0 0,1 100,240",
+        decor: [
+          { type: 'text', x: 180, y: 165, text: '葉片' }
+        ],
+        segments: [
+          { id: 's13_arc1', d: "M 100,240 A 160,160 0 0,1 260,80", kind: 'arc', role: 'boundary', label: '左上葉片弧' },
+          { id: 's13_arc2', d: "M 260,80 A 160,160 0 0,1 100,240", kind: 'arc', role: 'boundary', label: '右下葉片弧' },
+          { id: 's13_trap_t', d: "M 100,80 L 260,80", kind: 'line', role: 'trap', trapReason: "外面的正方形邊長沒有包住塗色葉片喔！沿著葉片邊緣走一圈，只有兩條彎彎的弧線。" },
+          { id: 's13_trap_r', d: "M 260,80 L 260,240", kind: 'line', role: 'trap', trapReason: "外面的正方形邊長沒有包住塗色葉片喔！沿著葉片邊緣走一圈，只有兩條彎彎的弧線。" },
+          { id: 's13_trap_b', d: "M 260,240 L 100,240", kind: 'line', role: 'trap', trapReason: "外面的正方形邊長沒有包住塗色葉片喔！沿著葉片邊緣走一圈，只有兩條彎彎的弧線。" },
+          { id: 's13_trap_l', d: "M 100,240 L 100,80", kind: 'line', role: 'trap', trapReason: "外面的正方形邊長沒有包住塗色葉片喔！沿著葉片邊緣走一圈，只有兩條彎彎的弧線。" }
+        ],
+        composition: "周長組成 ＝ 🔴 2 條四分之一圓弧 ＋ 🔵 0 條直線",
+        exampleCalc: "💡 觀念解析：葉片是被兩條四分之一圓弧圍起來的，正方形的 4 條直線都在外面空白處，所以周長只要算「2條四分之一圓弧」！"
+      },
+      {
+        id: 14,
+        tier: 3,
+        title: "蝴蝶結雙扇形（頂點相對）",
+        prompt: "左右兩個四分之一圓扇形頂點接在一起。請幫這兩個塗色扇形圍好柵欄，千萬別漏掉直線邊！",
+        // Center (180,160), R=100.
+        // Sector 1 (top-left): (180,160) -> (80,160) -> arc to (180,60) -> (180,160)
+        // Sector 2 (bottom-right): (180,160) -> (280,160) -> arc to (180,260) -> (180,160)
+        shadedPath: "M 180,160 L 80,160 A 100,100 0 0,1 180,60 L 180,260 A 100,100 0 0,0 280,160 Z",
+        antPath: "M 180,160 L 80,160 A 100,100 0 0,1 180,60 L 180,160 L 280,160 A 100,100 0 0,1 180,260 L 180,160",
+        decor: [
+          { type: 'point', x: 180, y: 160, label: '圓心' }
+        ],
+        segments: [
+          { id: 's14_arc_tl', d: "M 80,160 A 100,100 0 0,1 180,60", kind: 'arc', role: 'boundary', label: '左上扇形弧' },
+          { id: 's14_arc_br', d: "M 280,160 A 100,100 0 0,1 180,260", kind: 'arc', role: 'boundary', label: '右下扇形弧' },
+          { id: 's14_r_left', d: "M 180,160 L 80,160", kind: 'line', role: 'boundary', label: '左半徑' },
+          { id: 's14_r_top', d: "M 180,160 L 180,60", kind: 'line', role: 'boundary', label: '上半徑' },
+          { id: 's14_r_right', d: "M 180,160 L 280,160", kind: 'line', role: 'boundary', label: '右半徑' },
+          { id: 's14_r_bot', d: "M 180,160 L 180,260", kind: 'line', role: 'boundary', label: '下半徑' },
+          { id: 's14_trap_tr', d: "M 180,60 A 100,100 0 0,1 280,160", kind: 'arc', role: 'trap', trapReason: "右上角是空白沒有塗色的區域，這段虛線圓弧不用算喔！" },
+          { id: 's14_trap_bl', d: "M 180,260 A 100,100 0 0,1 80,160", kind: 'arc', role: 'trap', trapReason: "左下角是空白沒有塗色的區域，這段虛線圓弧不用算喔！" }
+        ],
+        composition: "周長組成 ＝ 🔴 2 條四分之一圓弧 ＋ 🔵 4 條半徑（合為 2 條直徑）",
+        exampleCalc: "💡 觀念解析：這兩塊扇形雖然頂點碰在一起，但它們的 4 條半徑全部都露在外面接觸空氣（沒有重疊在肚子裡），所以 4 條半徑都要算！"
+      },
+      {
+        id: 15,
+        tier: 3,
+        title: "彎月雲朵形（大半圓挖掉兩小半圓）",
+        prompt: "最後一關大魔王！大半圓底下被挖掉兩個空白的小半圓。仔細看塗色區域的底部是彎的還是直的？",
+        // Large semicircle from (60,220) to (300,220), center (180,220), R=120.
+        // Two small semicircles cut out from bottom: (60,220)-(180,220) R=60, and (180,220)-(300,220) R=60.
+        shadedPath: "M 60,220 A 120,120 0 0,1 300,220 A 60,60 0 0,0 180,220 A 60,60 0 0,0 60,220 Z",
+        antPath: "M 60,220 A 120,120 0 0,1 300,220 A 60,60 0 0,0 180,220 A 60,60 0 0,0 60,220",
+        decor: [
+          { type: 'point', x: 180, y: 220, label: '' },
+          { type: 'point', x: 120, y: 220, label: '' },
+          { type: 'point', x: 240, y: 220, label: '' }
+        ],
+        segments: [
+          { id: 's15_big_arc', d: "M 60,220 A 120,120 0 0,1 300,220", kind: 'arc', role: 'boundary', label: '上方大半圓弧' },
+          { id: 's15_sm_arc1', d: "M 60,220 A 60,60 0 0,1 180,220", kind: 'arc', role: 'boundary', label: '左下小半圓弧' },
+          { id: 's15_sm_arc2', d: "M 180,220 A 60,60 0 0,1 300,220", kind: 'arc', role: 'boundary', label: '右下小半圓弧' },
+          { id: 's15_trap_l', d: "M 60,220 L 180,220", kind: 'line', role: 'trap', trapReason: "底下的直線是空白小半圓的底部，沒有接觸到上面的塗色雲朵喔！塗色區域的底部是彎彎的小半圓弧！" },
+          { id: 's15_trap_r', d: "M 180,220 L 300,220", kind: 'line', role: 'trap', trapReason: "底下的直線是空白小半圓的底部，沒有接觸到上面的塗色雲朵喔！塗色區域的底部是彎彎的小半圓弧！" }
+        ],
+        composition: "周長組成 ＝ 🔴 1 條大半圓弧 ＋ 🔴 2 條小半圓弧（共 3 條彎弧，0 條直線！）",
+        exampleCalc: "💡 觀念解析：超強偵探！因為底下的直線部分被挖空了，塗色區域的邊界是由「1條大半圓弧 ＋ 2條小半圓弧」組成的，完全沒有直線！"
+      }
+    ];
+
+    /******************************************************************
+     * 應用程式狀態管理 (State & LocalStorage)
+     ******************************************************************/
+    const STORAGE_KEY = 'perimeter_detective_v1';
+
+    let state = {
+      currentTier: 1,
+      currentLevelId: 1,
+      activeTool: 'arc', // 'arc' (紅筆), 'line' (藍筆), 'eraser' (橡皮擦)
+      marks: {},         // 目前關卡的學生標記 { segmentId: 'arc' | 'line' }
+      solvedLevels: [],  // 已過關的 level ID 陣列
+      student: {
+        className: '',
+        seat: '',
+        name: ''
+      },
+      showAntPatrol: true,
+      currentLevelSolvedState: false,
+
+      // 隨機 5 題闖關模式狀態
+      quizMode: false,
+      quizLevelIds: [],
+      quizCurrentIndex: 0,
+      quizFirstTrySuccess: 0,
+      quizCurrentAttempted: false,
+      quizStartTime: null,
+      quizTimerInterval: null
+    };
+
+    // 載入 localStorage 資料
+    function loadProgress() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (Array.isArray(saved.solvedLevels)) state.solvedLevels = saved.solvedLevels;
+          if (saved.student) state.student = saved.student;
+          if (typeof saved.showAntPatrol === 'boolean') state.showAntPatrol = saved.showAntPatrol;
+        }
+      } catch (e) {
+        console.warn('無法讀取 localStorage:', e);
+      }
+      updateStudentHeaderDisplay();
+      updateSolvedBadge();
+      updateAntToggleUI();
+    }
+
+    // 儲存進度至 localStorage
+    function saveProgress() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+          solvedLevels: state.solvedLevels,
+          student: state.student,
+          showAntPatrol: state.showAntPatrol
+        }));
+      } catch (e) {
+        console.warn('無法寫入 localStorage:', e);
+      }
+      updateSolvedBadge();
+    }
+
+    /******************************************************************
+     * 介面渲染與關卡載入
+     ******************************************************************/
+    function getLevelById(id) {
+      return LEVELS.find(l => l.id === id) || LEVELS[0];
+    }
+
+    function switchTier(tierNum) {
+      if (state.quizMode) return;
+      state.currentTier = tierNum;
+      const firstLevelInTier = LEVELS.find(l => l.tier === tierNum);
+      if (firstLevelInTier) {
+        loadLevel(firstLevelInTier.id);
+      }
+    }
+
+    function renderNavigation() {
+      if (state.quizMode) {
+        document.getElementById('normalNavContainer').classList.add('hidden');
+        document.getElementById('quizNavContainer').classList.remove('hidden');
+
+        const pillsEl = document.getElementById('quizProgressPills');
+        pillsEl.innerHTML = state.quizLevelIds.map((lvlId, idx) => {
+          const isCurrent = idx === state.quizCurrentIndex;
+          const isDone = idx < state.quizCurrentIndex;
+          let cls = "bg-white text-slate-500 border-slate-300";
+          if (isDone) cls = "bg-emerald-500 text-white border-emerald-600";
+          else if (isCurrent) cls = "bg-amber-500 text-white border-amber-600 ring-2 ring-amber-300";
+          return `
+            <span class="w-7 h-7 rounded-lg text-xs font-black border flex items-center justify-center ${cls}">
+              ${isDone ? '✓' : idx + 1}
+            </span>
+          `;
+        }).join('');
+        return;
+      }
+
+      document.getElementById('normalNavContainer').classList.remove('hidden');
+      document.getElementById('quizNavContainer').classList.add('hidden');
+
+      // 更新三大難度 Tab 樣式
+      [1, 2, 3].forEach(t => {
+        const tab = document.getElementById(`tierTab${t}`);
+        if (t === state.currentTier) {
+          tab.className = "px-3 py-1 rounded-lg text-xs sm:text-sm font-black bg-white text-indigo-700 shadow-xs transition";
+        } else {
+          tab.className = "px-3 py-1 rounded-lg text-xs sm:text-sm font-bold text-slate-600 hover:text-slate-900 transition";
+        }
+      });
+
+      // 渲染該難度下的 5 個關卡按鈕
+      const tierLevels = LEVELS.filter(l => l.tier === state.currentTier);
+      const container = document.getElementById('levelPillsContainer');
+      container.innerHTML = tierLevels.map(l => {
+        const isCurrent = l.id === state.currentLevelId;
+        const isSolved = state.solvedLevels.includes(l.id);
+        let btnClass = "bg-white border-slate-200 text-slate-600 hover:bg-slate-100";
+        if (isCurrent) {
+          btnClass = "bg-amber-500 border-amber-600 text-white shadow-xs";
+        } else if (isSolved) {
+          btnClass = "bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100";
+        }
+        return `
+          <button onclick="loadLevel(${l.id})" class="px-2.5 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 shrink-0 transition ${btnClass}">
+            <span>#${l.id}</span>
+            <span class="max-w-[90px] truncate">${l.title.split('（')[0]}</span>
+            ${isSolved ? '<span>⭐</span>' : ''}
+          </button>
+        `;
+      }).join('');
+    }
+
+    function loadLevel(levelId) {
+      const level = getLevelById(levelId);
+      state.currentLevelId = level.id;
+      state.currentTier = level.tier;
+      state.marks = {};
+      state.currentLevelSolvedState = false;
+      state.quizCurrentAttempted = false;
+
+      // 更新標題與說明
+      const badgeEl = document.getElementById('levelNumberBadge');
+      if (state.quizMode) {
+        badgeEl.textContent = `闖關第 ${state.quizCurrentIndex + 1} / 5 題`;
+        badgeEl.className = "bg-indigo-600 text-white text-xs font-black px-2.5 py-0.5 rounded-md";
+      } else {
+        badgeEl.textContent = `第 ${level.id} 關`;
+        badgeEl.className = "bg-amber-500 text-white text-xs font-black px-2.5 py-0.5 rounded-md";
+      }
+
+      document.getElementById('levelTitle').textContent = level.title;
+      document.getElementById('levelPrompt').textContent = level.prompt;
+
+      const solvedTag = document.getElementById('levelSolvedTag');
+      if (state.solvedLevels.includes(level.id) && !state.quizMode) {
+        solvedTag.classList.remove('hidden');
+      } else {
+        solvedTag.classList.add('hidden');
+      }
+
+      // 隱藏下一關按鈕與解答拆解卡
+      document.getElementById('nextLevelBtn').classList.add('hidden');
+      document.getElementById('formulaBreakdownCard').classList.add('hidden');
+
+      // 重設預設回饋盒
+      setFeedback('default', '周長小偵探任務提示', '請先選擇「🔴 弧長筆」或「🔵 直線筆」，在左方圖形點選塗色區域的<strong>外圍邊界</strong>，完成後按下「檢查答案（倒水測試）」！');
+
+      renderNavigation();
+      renderSvgDiagram(level);
+      updateLiveCounter();
+    }
+
+    /******************************************************************
+     * 渲染互動式 SVG 圖形與點擊事件
+     ******************************************************************/
+    function renderSvgDiagram(level) {
+      const shadedLayer = document.getElementById('svgShadedLayer');
+      const decorLayer = document.getElementById('svgDecorLayer');
+      const segmentsLayer = document.getElementById('svgSegmentsLayer');
+      const antLayer = document.getElementById('svgAntLayer');
+
+      shadedLayer.innerHTML = '';
+      decorLayer.innerHTML = '';
+      segmentsLayer.innerHTML = '';
+      antLayer.innerHTML = '';
+
+      // 1. 繪製塗色區域 (草皮)
+      const shadedPathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      shadedPathEl.setAttribute('id', 'mainShadedRegion');
+      shadedPathEl.setAttribute('d', level.shadedPath);
+      shadedPathEl.setAttribute('fill', 'url(#grassPattern)');
+      shadedPathEl.setAttribute('stroke', 'none');
+      shadedLayer.appendChild(shadedPathEl);
+
+      // 2. 繪製輔助裝飾 (圓心點、直角符號、角度文字)
+      if (level.decor) {
+        level.decor.forEach(item => {
+          if (item.type === 'point') {
+            const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            c.setAttribute('cx', item.x);
+            c.setAttribute('cy', item.y);
+            c.setAttribute('r', '4');
+            c.setAttribute('fill', '#475569');
+            decorLayer.appendChild(c);
+
+            if (item.label) {
+              const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+              t.setAttribute('x', item.x);
+              t.setAttribute('y', item.y + 18);
+              t.setAttribute('text-anchor', 'middle');
+              t.setAttribute('fill', '#64748b');
+              t.setAttribute('font-size', '12');
+              t.setAttribute('font-weight', '700');
+              t.textContent = item.label;
+              decorLayer.appendChild(t);
+            }
+          } else if (item.type === 'rightAngle') {
+            const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            p.setAttribute('d', item.d);
+            p.setAttribute('fill', 'none');
+            p.setAttribute('stroke', '#64748b');
+            p.setAttribute('stroke-width', '2');
+            decorLayer.appendChild(p);
+          } else if (item.type === 'arcLabel') {
+            const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            p.setAttribute('d', item.d);
+            p.setAttribute('fill', 'none');
+            p.setAttribute('stroke', '#64748b');
+            p.setAttribute('stroke-width', '2');
+            p.setAttribute('stroke-dasharray', '3,3');
+            decorLayer.appendChild(p);
+
+            const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            t.setAttribute('x', item.tx);
+            t.setAttribute('y', item.ty);
+            t.setAttribute('text-anchor', 'middle');
+            t.setAttribute('fill', '#475569');
+            t.setAttribute('font-size', '13');
+            t.setAttribute('font-weight', '800');
+            t.textContent = item.text;
+            decorLayer.appendChild(t);
+          } else if (item.type === 'text') {
+            const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            t.setAttribute('x', item.x);
+            t.setAttribute('y', item.y);
+            t.setAttribute('text-anchor', 'middle');
+            t.setAttribute('fill', '#78716c');
+            t.setAttribute('font-size', '13');
+            t.setAttribute('font-weight', '700');
+            t.textContent = item.text;
+            decorLayer.appendChild(t);
+          }
+        });
+      }
+
+      // 3. 繪製可點擊互動線段
+      level.segments.forEach(seg => {
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+        // 隱形加粗感應區 (方便平板手指與滑鼠點擊)
+        const hitPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        hitPath.setAttribute('d', seg.d);
+        hitPath.setAttribute('fill', 'none');
+        hitPath.setAttribute('stroke', 'transparent');
+        hitPath.setAttribute('stroke-width', '26');
+        hitPath.setAttribute('stroke-linecap', 'round');
+        hitPath.setAttribute('class', 'seg-hit');
+        hitPath.addEventListener('click', () => onSegmentClick(seg.id));
+
+        // 視覺顯示線段
+        const visPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        visPath.setAttribute('id', `vis_${seg.id}`);
+        visPath.setAttribute('d', seg.d);
+        visPath.setAttribute('fill', 'none');
+        visPath.setAttribute('stroke-linecap', 'round');
+        visPath.setAttribute('class', 'seg-vis');
+
+        group.appendChild(hitPath);
+        group.appendChild(visPath);
+        segmentsLayer.appendChild(group);
+
+        updateSegmentVisual(seg);
+      });
+    }
+
+    // 更新單一線段的顏色與虛實樣式
+    function updateSegmentVisual(seg, highlightStatus = null) {
+      const visEl = document.getElementById(`vis_${seg.id}`);
+      if (!visEl) return;
+
+      visEl.classList.remove('anim-leak', 'anim-trap');
+
+      const mark = state.marks[seg.id];
+      if (highlightStatus === 'leak') {
+        visEl.classList.add('anim-leak');
+        visEl.setAttribute('stroke-dasharray', 'none');
+        return;
+      }
+      if (highlightStatus === 'trap') {
+        visEl.classList.add('anim-trap');
+        visEl.setAttribute('stroke-dasharray', 'none');
+        return;
+      }
+
+      if (mark === 'arc') {
+        // 紅筆標記
+        visEl.setAttribute('stroke', '#ef4444');
+        visEl.setAttribute('stroke-width', '8');
+        visEl.setAttribute('stroke-dasharray', 'none');
+      } else if (mark === 'line') {
+        // 藍筆標記
+        visEl.setAttribute('stroke', '#2563eb');
+        visEl.setAttribute('stroke-width', '8');
+        visEl.setAttribute('stroke-dasharray', 'none');
+      } else {
+        // 未標記的初始狀態：內部陷阱線用虛線，實體邊界用淺灰實線
+        if (seg.role === 'trap') {
+          visEl.setAttribute('stroke', '#94a3b8');
+          visEl.setAttribute('stroke-width', '3');
+          visEl.setAttribute('stroke-dasharray', '7,6');
+        } else {
+          visEl.setAttribute('stroke', '#64748b');
+          visEl.setAttribute('stroke-width', '3.5');
+          visEl.setAttribute('stroke-dasharray', 'none');
+        }
+      }
+    }
+
+    // 當學生點擊某條線段時
+    function onSegmentClick(segId) {
+      const level = getLevelById(state.currentLevelId);
+      const seg = level.segments.find(s => s.id === segId);
+      if (!seg) return;
+
+      // 清除任何先前的錯誤閃爍動畫
+      level.segments.forEach(s => updateSegmentVisual(s));
+
+      if (state.activeTool === 'eraser') {
+        delete state.marks[segId];
+      } else {
+        // 若已經用同一支筆畫過，再次點擊可取消標記；若不同筆則換色
+        if (state.marks[segId] === state.activeTool) {
+          delete state.marks[segId];
+        } else {
+          state.marks[segId] = state.activeTool;
+        }
+      }
+
+      updateSegmentVisual(seg);
+      updateLiveCounter();
+    }
+
+    // 切換畫筆工具
+    function selectTool(toolName) {
+      state.activeTool = toolName;
+      const arcBtn = document.getElementById('penArcBtn');
+      const lineBtn = document.getElementById('penLineBtn');
+      const eraserBtn = document.getElementById('penEraserBtn');
+
+      arcBtn.classList.remove('active-arc');
+      lineBtn.classList.remove('active-line');
+      eraserBtn.classList.remove('active-eraser');
+
+      if (toolName === 'arc') arcBtn.classList.add('active-arc');
+      else if (toolName === 'line') lineBtn.classList.add('active-line');
+      else if (toolName === 'eraser') eraserBtn.classList.add('active-eraser');
+    }
+
+    // 清除目前關卡的所有標記
+    function clearCurrentMarks() {
+      state.marks = {};
+      const level = getLevelById(state.currentLevelId);
+      level.segments.forEach(s => updateSegmentVisual(s));
+      document.getElementById('svgAntLayer').innerHTML = '';
+      document.getElementById('mainShadedRegion')?.setAttribute('fill', 'url(#grassPattern)');
+      updateLiveCounter();
+    }
+
+    // 即時更新「看圖點菜」計數面板
+    function updateLiveCounter() {
+      let arcCount = 0;
+      let lineCount = 0;
+      Object.values(state.marks).forEach(val => {
+        if (val === 'arc') arcCount++;
+        else if (val === 'line') lineCount++;
+      });
+
+      document.getElementById('arcCountNum').textContent = arcCount;
+      document.getElementById('lineCountNum').textContent = lineCount;
+
+      const summaryEl = document.getElementById('liveFormulaSummary');
+      if (arcCount === 0 && lineCount === 0) {
+        summaryEl.innerHTML = `<span class="text-slate-400">尚未標記任何線段</span>`;
+      } else {
+        summaryEl.innerHTML = `
+          <span class="text-red-600">🔴 彎的線 ${arcCount} 條</span>
+          <span class="mx-1 text-slate-400">＋</span>
+          <span class="text-blue-600">🔵 直的線 ${lineCount} 條</span>
+        `;
+      }
+    }
+
+    /******************************************************************
+     * 核心教學機制 4：「倒水不漏水 / 小螞蟻散步」診斷驗證
+     ******************************************************************/
+    function verifyPerimeter() {
+      const level = getLevelById(state.currentLevelId);
+      // 先重置所有線段視覺
+      level.segments.forEach(s => updateSegmentVisual(s));
+
+      const selectedTrapSegments = [];
+      const missingBoundarySegments = [];
+      const wrongColorSegments = [];
+
+      level.segments.forEach(seg => {
+        const userMark = state.marks[seg.id];
+        if (seg.role === 'trap') {
+          if (userMark) {
+            selectedTrapSegments.push(seg);
+          }
+        } else if (seg.role === 'boundary') {
+          if (!userMark) {
+            missingBoundarySegments.push(seg);
+          } else if (userMark !== seg.kind) {
+            wrongColorSegments.push(seg);
+          }
+        }
+      });
+
+      // 狀況 1：誤選了內部陷阱線或外部空白輔助線
+      if (selectedTrapSegments.length > 0) {
+        state.quizCurrentAttempted = true;
+        selectedTrapSegments.forEach(seg => updateSegmentVisual(seg, 'trap'));
+        const reason = selectedTrapSegments[0].trapReason || "你畫到塗色區域『肚子裡面』或『空白外面』的輔助線了！蓋柵欄只需要圍塗色區域最外面的邊界喔！";
+        setFeedback('trap', '哎呀！畫到不用算的陷阱線了！', reason);
+        return;
+      }
+
+      // 狀況 2：有外圍邊界漏掉沒圍起來（漏水啦！）
+      if (missingBoundarySegments.length > 0) {
+        state.quizCurrentAttempted = true;
+        missingBoundarySegments.forEach(seg => updateSegmentVisual(seg, 'leak'));
+        setFeedback(
+          'leak',
+          `柵欄有缺口（漏水啦）！還有 ${missingBoundarySegments.length} 段邊界沒圍到`,
+          '看！畫面上<strong>閃爍黃光的地方</strong>就是漏水的缺口！找找看塗色區域是不是還有外圍邊界（像是扇形的半徑、直線邊或圓弧）忘記圍起來？'
+        );
+        return;
+      }
+
+      // 狀況 3：位置全找對了，但紅藍筆顏色分類錯誤
+      if (wrongColorSegments.length > 0) {
+        state.quizCurrentAttempted = true;
+        wrongColorSegments.forEach(seg => updateSegmentVisual(seg, 'leak'));
+        setFeedback(
+          'color',
+          '周長位置找對囉！但畫筆顏色分錯啦！',
+          '你成功把塗色區域圍起來了！不過請檢查閃爍的線段：記得把<strong>「彎的弧線」換成紅筆 🔴</strong>、<strong>「直的線段」換成藍筆 🔵</strong>，這樣列算式時才不會搞混喔！'
+        );
+        return;
+      }
+
+      // 狀況 4：100% 完全正確！
+      handleLevelSuccess(level);
+    }
+
+    function handleLevelSuccess(level) {
+      state.currentLevelSolvedState = true;
+
+      // 記錄過關狀態
+      if (!state.solvedLevels.includes(level.id)) {
+        state.solvedLevels.push(level.id);
+        saveProgress();
+      }
+
+      // 若在隨機 5 題闖關模式且第一次就按對
+      if (state.quizMode && !state.quizCurrentAttempted) {
+        state.quizFirstTrySuccess++;
+      }
+
+      // 將草皮切換為翠綠色慶祝效果
+      document.getElementById('mainShadedRegion')?.setAttribute('fill', 'url(#grassSuccessPattern)');
+      document.getElementById('levelSolvedTag').classList.remove('hidden');
+
+      setFeedback(
+        'success',
+        '🎉 太棒了！倒水測試 100% 完美不漏水！',
+        '你精準找出了塗色區域所有的外圍邊界，而且「彎的弧線」與「直的線段」分類完全正確！看看底下的觀念拆解吧！'
+      );
+
+      // 顯示周長組成與列式觀念卡
+      const breakdownCard = document.getElementById('formulaBreakdownCard');
+      document.getElementById('formulaCompositionText').textContent = level.composition;
+      document.getElementById('formulaExampleText').textContent = level.exampleCalc;
+      breakdownCard.classList.remove('hidden');
+
+      // 顯示下一關按鈕
+      const nextBtn = document.getElementById('nextLevelBtn');
+      const nextBtnText = document.getElementById('nextLevelBtnText');
+      nextBtn.classList.remove('hidden');
+
+      if (state.quizMode) {
+        if (state.quizCurrentIndex < state.quizLevelIds.length - 1) {
+          nextBtnText.textContent = `下一題 (${state.quizCurrentIndex + 2}/5)`;
+        } else {
+          nextBtnText.textContent = `查看闖關證書 🏆`;
+        }
+      } else {
+        nextBtnText.textContent = level.id < LEVELS.length ? '下一關' : '回到第 1 關';
+      }
+
+      renderNavigation();
+      renderAntPatrolAnimation(level);
+    }
+
+    // 設定回饋訊息盒外觀
+    function setFeedback(type, title, htmlMsg) {
+      const box = document.getElementById('feedbackBox');
+      const icon = document.getElementById('feedbackIcon');
+      const titleEl = document.getElementById('feedbackTitle');
+      const msgEl = document.getElementById('feedbackMessage');
+
+      titleEl.textContent = title;
+      msgEl.innerHTML = htmlMsg;
+
+      if (type === 'trap') {
+        box.className = "rounded-xl p-3.5 border-2 border-purple-300 bg-purple-50 transition-all";
+        icon.textContent = "🚫";
+        titleEl.className = "font-black text-sm sm:text-base text-purple-900";
+        msgEl.className = "text-xs sm:text-sm text-purple-800 mt-1 leading-relaxed";
+      } else if (type === 'leak' || type === 'color') {
+        box.className = "rounded-xl p-3.5 border-2 border-amber-400 bg-amber-50 transition-all";
+        icon.textContent = "💦";
+        titleEl.className = "font-black text-sm sm:text-base text-amber-900";
+        msgEl.className = "text-xs sm:text-sm text-amber-800 mt-1 leading-relaxed";
+      } else if (type === 'success') {
+        box.className = "rounded-xl p-3.5 border-2 border-emerald-400 bg-emerald-50 transition-all";
+        icon.textContent = "✅";
+        titleEl.className = "font-black text-sm sm:text-base text-emerald-900";
+        msgEl.className = "text-xs sm:text-sm text-emerald-800 mt-1 leading-relaxed";
+      } else {
+        box.className = "rounded-xl p-3.5 border-2 border-slate-200 bg-slate-50 transition-all";
+        icon.textContent = "💡";
+        titleEl.className = "font-black text-sm sm:text-base text-slate-800";
+        msgEl.className = "text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed";
+      }
+    }
+
+    // 繪製小螞蟻沿著封閉周長散步的 SVG 動畫
+    function renderAntPatrolAnimation(level) {
+      const antLayer = document.getElementById('svgAntLayer');
+      antLayer.innerHTML = '';
+
+      if (!state.showAntPatrol || !state.currentLevelSolvedState) return;
+
+      const antGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+
+      // 螞蟻底圈光環
+      const halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      halo.setAttribute('r', '14');
+      halo.setAttribute('fill', '#fef3c7');
+      halo.setAttribute('stroke', '#f59e0b');
+      halo.setAttribute('stroke-width', '2');
+
+      // 螞蟻圖示
+      const antText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      antText.setAttribute('x', '0');
+      antText.setAttribute('y', '6');
+      antText.setAttribute('text-anchor', 'middle');
+      antText.setAttribute('font-size', '18');
+      antText.textContent = '🐜';
+
+      // SVG animateMotion 沿著周長路徑移動
+      const animMotion = document.createElementNS('http://www.w3.org/2000/svg', 'animateMotion');
+      animMotion.setAttribute('dur', '6.5s');
+      animMotion.setAttribute('repeatCount', 'indefinite');
+      animMotion.setAttribute('path', level.antPath);
+
+      antGroup.appendChild(halo);
+      antGroup.appendChild(antText);
+      antGroup.appendChild(animMotion);
+      antLayer.appendChild(antGroup);
+    }
+
+    function toggleAntPatrol() {
+      state.showAntPatrol = !state.showAntPatrol;
+      updateAntToggleUI();
+      saveProgress();
+      const level = getLevelById(state.currentLevelId);
+      renderAntPatrolAnimation(level);
+    }
+
+    function updateAntToggleUI() {
+      const btn = document.getElementById('antToggleBtn');
+      const text = document.getElementById('antToggleText');
+      if (state.showAntPatrol) {
+        btn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition shrink-0 bg-amber-50 border-amber-300 text-amber-800 hover:bg-amber-100";
+        text.textContent = "小螞蟻巡邏：開";
+      } else {
+        btn.className = "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition shrink-0 bg-slate-100 border-slate-300 text-slate-500 hover:bg-slate-200";
+        text.textContent = "小螞蟻巡邏：關";
+      }
+    }
+
+    // 前往下一關
+    function goToNextLevel() {
+      if (state.quizMode) {
+        if (state.quizCurrentIndex < state.quizLevelIds.length - 1) {
+          state.quizCurrentIndex++;
+          loadLevel(state.quizLevelIds[state.quizCurrentIndex]);
+        } else {
+          finishRandomQuiz();
+        }
+        return;
+      }
+
+      const nextId = state.currentLevelId < LEVELS.length ? state.currentLevelId + 1 : 1;
+      loadLevel(nextId);
+    }
+
+    /******************************************************************
+     * 老師與學生專用：「隨機抽 5 題闖關模式」
+     * 確保每位學生練習 5 張不同難度組合的圖形並產出成果卡
+     ******************************************************************/
+    function startRandomQuiz() {
+      closeCertificateModal();
+
+      // 從基礎(1-5)抽 2 題、進階(6-10)抽 2 題、挑戰(11-15)抽 1 題，共 5 題
+      const pickRandom = (arr, n) => {
+        const copy = [...arr];
+        for (let i = copy.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy.slice(0, n);
+      };
+
+      const tier1Ids = LEVELS.filter(l => l.tier === 1).map(l => l.id);
+      const tier2Ids = LEVELS.filter(l => l.tier === 2).map(l => l.id);
+      const tier3Ids = LEVELS.filter(l => l.tier === 3).map(l => l.id);
+
+      const selectedIds = [
+        ...pickRandom(tier1Ids, 2),
+        ...pickRandom(tier2Ids, 2),
+        ...pickRandom(tier3Ids, 1)
+      ];
+
+      state.quizMode = true;
+      state.quizLevelIds = selectedIds;
+      state.quizCurrentIndex = 0;
+      state.quizFirstTrySuccess = 0;
+      state.quizStartTime = Date.now();
+
+      if (state.quizTimerInterval) clearInterval(state.quizTimerInterval);
+      state.quizTimerInterval = setInterval(updateQuizTimer, 1000);
+      updateQuizTimer();
+
+      document.getElementById('quizModeBtnText').textContent = "重新抽 5 題";
+      loadLevel(state.quizLevelIds[0]);
+    }
+
+    function updateQuizTimer() {
+      if (!state.quizMode || !state.quizStartTime) return;
+      const elapsedSec = Math.floor((Date.now() - state.quizStartTime) / 1000);
+      const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+      const secs = String(elapsedSec % 60).padStart(2, '0');
+      document.getElementById('quizTimerDisplay').textContent = `⏱️ ${mins}:${secs}`;
+    }
+
+    function exitRandomQuiz() {
+      if (state.quizTimerInterval) clearInterval(state.quizTimerInterval);
+      state.quizMode = false;
+      document.getElementById('quizModeBtnText').textContent = "隨機抽 5 題闖關";
+      loadLevel(state.currentLevelId);
+    }
+
+    function finishRandomQuiz() {
+      if (state.quizTimerInterval) clearInterval(state.quizTimerInterval);
+      const elapsedSec = Math.floor((Date.now() - state.quizStartTime) / 1000);
+      const mins = String(Math.floor(elapsedSec / 60)).padStart(2, '0');
+      const secs = String(elapsedSec % 60).padStart(2, '0');
+
+      const s = state.student;
+      const displayStudent = (s.className || s.seat || s.name)
+        ? `${s.className ? s.className + ' ' : ''}${s.seat ? s.seat + '號 ' : ''}${s.name || ''}`.trim()
+        : '六年級周長小偵探（可點上方設定座號姓名）';
+
+      document.getElementById('certStudentName').textContent = displayStudent;
+      const accuracy = Math.round((state.quizFirstTrySuccess / 5) * 100);
+      document.getElementById('certAccuracy').textContent = `${accuracy}%`;
+      document.getElementById('certTimeUsed').textContent = `${mins}:${secs}`;
+
+      const listEl = document.getElementById('certCompletedList');
+      listEl.innerHTML = state.quizLevelIds.map(id => {
+        const lvl = getLevelById(id);
+        return `<span class="bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold px-2.5 py-1 rounded-lg">✔ #${lvl.id} ${lvl.title}</span>`;
+      }).join('');
+
+      document.getElementById('certificateModal').classList.remove('hidden');
+    }
+
+    function closeCertificateModal() {
+      document.getElementById('certificateModal').classList.add('hidden');
+    }
+
+    function closeCertificateAndReturn() {
+      closeCertificateModal();
+      exitRandomQuiz();
+    }
+
+    /******************************************************************
+     * 學生座號/姓名設定與進度重置視窗
+     ******************************************************************/
+    function updateStudentHeaderDisplay() {
+      const s = state.student;
+      const el = document.getElementById('studentDisplay');
+      if (s.seat || s.name) {
+        el.textContent = `${s.className ? s.className + ' ' : ''}${s.seat ? s.seat + '號 ' : ''}${s.name || ''}`.trim();
+      } else {
+        el.textContent = '設定座號/姓名';
+      }
+    }
+
+    function updateSolvedBadge() {
+      document.getElementById('solvedCountBadge').textContent = `${state.solvedLevels.length} / ${LEVELS.length}`;
+    }
+
+    function openStudentModal() {
+      document.getElementById('inputClass').value = state.student.className || '';
+      document.getElementById('inputSeat').value = state.student.seat || '';
+      document.getElementById('inputName').value = state.student.name || '';
+      document.getElementById('studentModal').classList.remove('hidden');
+    }
+
+    function closeStudentModal() {
+      document.getElementById('studentModal').classList.add('hidden');
+    }
+
+    function saveStudentInfo() {
+      state.student = {
+        className: document.getElementById('inputClass').value.trim(),
+        seat: document.getElementById('inputSeat').value.trim(),
+        name: document.getElementById('inputName').value.trim()
+      };
+      saveProgress();
+      updateStudentHeaderDisplay();
+      closeStudentModal();
+    }
+
+    function openResetModal() {
+      document.getElementById('resetModal').classList.remove('hidden');
+    }
+
+    function closeResetModal() {
+      document.getElementById('resetModal').classList.add('hidden');
+    }
+
+    function confirmResetProgress() {
+      state.solvedLevels = [];
+      saveProgress();
+      closeResetModal();
+      loadLevel(state.currentLevelId);
+    }
+
+    // 啟動初始化
+    window.onload = function () {
+      loadProgress();
+      loadLevel(1);
+    };
+  </script>
+</body>
+</html>
